@@ -94,19 +94,31 @@ typedef struct {
 
 /* Decode options for v2 API.
  * - frequency: nominal QSO frequency in Hz (passed as nfqso to the decoder)
+ * - tx_frequency: transmit audio offset in Hz (passed as nftx to the decoder)
  * - threads:   thread hint forwarded to the decoder (1..N)
  * - low_freq:  decoder scan low limit in Hz  (default 200)
  * - high_freq: decoder scan high limit in Hz (default 4000)
  * - tolerance: frequency tolerance in Hz     (default 20)
+ * - mycall:    local callsign for AP decode (empty = none)
+ * - mygrid:    local grid for AP decode (empty = none)
  * - hiscall:   DX callsign for AP decode (empty = none)
  * - hisgrid:   DX 4-char grid for AP decode (empty = none)
+ * - ap_decode: enable AP decode passes (default 1)
+ * - decode_depth: WSJT-X decode depth (default 1)
+ * - qso_progress: WSJT-X QSO progress stage (default 0)
  */
 typedef struct {
     int frequency;
+    int tx_frequency;
     int threads;
     int low_freq;
     int high_freq;
     int tolerance;
+    int ap_decode;
+    int decode_depth;
+    int qso_progress;
+    char mycall[13];
+    char mygrid[7];
     char hiscall[13];
     char hisgrid[7];
 } wsjtx_decode_options_t;

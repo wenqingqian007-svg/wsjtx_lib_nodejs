@@ -35,12 +35,18 @@ interface NativeBinding {
 
 interface NativeDecodeOptions {
   frequency: number;
+  txFrequency: number;
   threads: number;
   lowFreq: number;
   highFreq: number;
   tolerance: number;
+  myCall: string;
+  myGrid: string;
   dxCall: string;
   dxGrid: string;
+  apDecode: boolean;
+  decodeDepth: number;
+  qsoProgress: number;
 }
 
 interface NativeWSJTXLib {
@@ -95,12 +101,18 @@ export class WSJTXLib {
 
     const opts: NativeDecodeOptions = {
       frequency: options.frequency,
+      txFrequency: options.txFrequency ?? options.frequency,
       threads: options.threads ?? this.config.maxThreads,
       lowFreq: options.lowFreq ?? this.config.defaultLowFreq,
       highFreq: options.highFreq ?? this.config.defaultHighFreq,
       tolerance: options.tolerance ?? this.config.defaultTolerance,
+      myCall: options.myCall ?? '',
+      myGrid: options.myGrid ?? '',
       dxCall: options.dxCall ?? '',
       dxGrid: options.dxGrid ?? '',
+      apDecode: options.apDecode ?? true,
+      decodeDepth: options.decodeDepth ?? 1,
+      qsoProgress: options.qsoProgress ?? 0,
     };
 
     return new Promise((resolve, reject) => {

@@ -44,13 +44,21 @@ static inline wsjtx_lib* to_lib(wsjtx_handle_t h) {
     return static_cast<wsjtx_lib*>(h);
 }
 
-/* Apply v2 decode options (dxCall, dxGrid, freq range) onto the lib instance.
- * Empty hiscall/hisgrid leave existing dx info unchanged on the instance.
- * Range fields are always applied so callers get deterministic behavior. */
+/* Apply v2 decode options onto the lib instance.
+ * Station fields are always applied so consecutive decodes do not reuse
+ * stale AP context from a previous request. */
 static void apply_decode_options(wsjtx_lib* lib, const wsjtx_decode_options_t* opts) {
-    if (opts->hiscall[0]) lib->setDxCall(std::string(opts->hiscall));
-    if (opts->hisgrid[0]) lib->setDxGrid(std::string(opts->hisgrid));
+    lib->setDecodeStationInfo(
+        std::string(opts->mycall),
+        std::string(opts->mygrid),
+        std::string(opts->hiscall),
+        std::string(opts->hisgrid));
     lib->setDecodeRange(opts->low_freq, opts->high_freq, opts->tolerance);
+    lib->setDecodeControls(
+        opts->ap_decode != 0,
+        opts->decode_depth,
+        opts->tx_frequency,
+        opts->qso_progress);
 }
 
 /* ---- Lifecycle ---- */

@@ -37,20 +37,30 @@ export interface WSJTXMessage {
  * Options accepted by `WSJTXLib.decode`.
  *
  * - frequency: nominal QSO frequency in Hz (decoder uses this as nfqso).
+ * - txFrequency: transmit audio offset in Hz (decoder uses this as nftx).
  * - threads:   thread hint forwarded to the decoder. Defaults to maxThreads.
- * - dxCall / dxGrid: enables A8 list / AP decode for the named station.
+ * - myCall / myGrid / dxCall / dxGrid: AP decode context for the named station.
  * - lowFreq / highFreq / tolerance: scan window and tone tolerance in Hz
  *   (defaults: 200 / 4000 / 20). These are forwarded to the decoder via
  *   `setDecodeRange` and *do* take effect.
+ * - apDecode: enables FT8/FT4 AP decode passes. Defaults to true.
+ * - decodeDepth: WSJT-X decoder depth. Defaults to 1.
+ * - qsoProgress: WSJT-X QSO progress stage. Defaults to 0.
  */
 export interface DecodeOptions {
   frequency: number;
+  txFrequency?: number;
   threads?: number;
+  myCall?: string;
+  myGrid?: string;
   dxCall?: string;
   dxGrid?: string;
   lowFreq?: number;
   highFreq?: number;
   tolerance?: number;
+  apDecode?: boolean;
+  decodeDepth?: number;
+  qsoProgress?: number;
 }
 
 export interface DecodeResult {

@@ -63,10 +63,16 @@ namespace wsjtx_nodejs
 
         wsjtx_decode_options_t opts = {};
         opts.frequency = optObj.Get("frequency").As<Napi::Number>().Int32Value();
+        opts.tx_frequency = optObj.Has("txFrequency") ? optObj.Get("txFrequency").As<Napi::Number>().Int32Value() : opts.frequency;
         opts.threads   = optObj.Has("threads") ? optObj.Get("threads").As<Napi::Number>().Int32Value() : 4;
         opts.low_freq  = optObj.Has("lowFreq") ? optObj.Get("lowFreq").As<Napi::Number>().Int32Value() : 200;
         opts.high_freq = optObj.Has("highFreq") ? optObj.Get("highFreq").As<Napi::Number>().Int32Value() : 4000;
         opts.tolerance = optObj.Has("tolerance") ? optObj.Get("tolerance").As<Napi::Number>().Int32Value() : 20;
+        opts.ap_decode = optObj.Has("apDecode") ? (optObj.Get("apDecode").As<Napi::Boolean>().Value() ? 1 : 0) : 1;
+        opts.decode_depth = optObj.Has("decodeDepth") ? optObj.Get("decodeDepth").As<Napi::Number>().Int32Value() : 1;
+        opts.qso_progress = optObj.Has("qsoProgress") ? optObj.Get("qsoProgress").As<Napi::Number>().Int32Value() : 0;
+        if (optObj.Has("myCall")) { auto s = optObj.Get("myCall").As<Napi::String>().Utf8Value(); strncpy(opts.mycall, s.c_str(), 12); }
+        if (optObj.Has("myGrid")) { auto s = optObj.Get("myGrid").As<Napi::String>().Utf8Value(); strncpy(opts.mygrid, s.c_str(), 6); }
         if (optObj.Has("dxCall")) { auto s = optObj.Get("dxCall").As<Napi::String>().Utf8Value(); strncpy(opts.hiscall, s.c_str(), 12); }
         if (optObj.Has("dxGrid")) { auto s = optObj.Get("dxGrid").As<Napi::String>().Utf8Value(); strncpy(opts.hisgrid, s.c_str(), 6); }
 
