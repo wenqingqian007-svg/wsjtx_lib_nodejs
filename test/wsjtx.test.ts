@@ -20,6 +20,7 @@
 
 import { describe, it, beforeEach, after, before } from 'node:test';
 import assert from 'node:assert';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,8 +30,8 @@ import type { DecodeOptions, DecodeResult, EncodeResult } from '../src/index.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, '..', 'test', 'output');
 
-/** FT8 sample rate from the encoder is 48 kHz (12.64 s + a margin). */
-const ENCODE_SAMPLE_RATE = 48000;
+/** Default FT8/FT4 encode sample rate. */
+const ENCODE_SAMPLE_RATE = 12000;
 
 function freshOutputDir(): void {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -59,6 +60,14 @@ function toInt16(audio: Float32Array): Int16Array {
   return out;
 }
 
+function runIsolatedNode(code: string): void {
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', code], {
+    cwd: path.resolve(__dirname, '..'),
+    encoding: 'utf8',
+  });
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+}
+
 describe('WSJTX library — regression', () => {
   let lib: WSJTXLib;
 
@@ -77,12 +86,21 @@ describe('WSJTX library — regression', () => {
   // ---- Capabilities ----
 
   describe('capability queries', () => {
-    it('FT8 sample rate is 48 kHz', () => {
-      assert.strictEqual(lib.getSampleRate(WSJTXMode.FT8), 48000);
+    it('FT8 default sample rate is 12 kHz', () => {
+      assert.strictEqual(lib.getSampleRate(WSJTXMode.FT8), 12000);
     });
 
-    it('FT4 sample rate is 48 kHz', () => {
-      assert.strictEqual(lib.getSampleRate(WSJTXMode.FT4), 48000);
+    it('FT4 default sample rate is 12 kHz', () => {
+      assert.strictEqual(lib.getSampleRate(WSJTXMode.FT4), 12000);
+    });
+
+    it('FT8/FT4 sample rate can opt into 48 kHz per instance', () => {
+      runIsolatedNode(`
+        import { WSJTXLib, WSJTXMode } from './src/index.js';
+        const lib = new WSJTXLib({ encodeSampleRate: 48000 });
+        if (lib.getSampleRate(WSJTXMode.FT8) !== 48000) process.exit(1);
+        if (lib.getSampleRate(WSJTXMode.FT4) !== 48000) process.exit(1);
+      `);
     });
 
     it('FT8 transmission duration is 12.64 s', () => {
@@ -144,9 +162,10 @@ describe('WSJTX library — regression', () => {
         const result = await lib.encode(WSJTXMode.FT8, msg, 1500);
         assert.ok(result.audioData instanceof Float32Array);
         assert.ok(result.audioData.length > 0);
-        // FT8 transmission is 12.64 s @ 48 kHz ~= 607k samples
+        assert.strictEqual(result.sampleRate, 12000);
+        // FT8 transmission is 12.64 s @ 12 kHz = 151680 samples
         assert.ok(
-          result.audioData.length >= 600_000 && result.audioData.length <= 620_000,
+          result.audioData.length >= 151_000 && result.audioData.length <= 152_000,
           `unexpected sample count: ${result.audioData.length}`,
         );
         assert.ok(typeof result.messageSent === 'string' && result.messageSent.length > 0);
@@ -155,14 +174,26 @@ describe('WSJTX library — regression', () => {
       it(`FT4 encodes "${msg}"`, async () => {
         const result = await lib.encode(WSJTXMode.FT4, msg, 1500);
         assert.ok(result.audioData.length > 0);
-        // FT4 keying duration is ~5.04 s @ 48 kHz ~= 242k samples
+        assert.strictEqual(result.sampleRate, 12000);
+        // FT4 keying duration is ~5.04 s @ 12 kHz = 60480 samples
         // (slot length is 6 s, but actual emitted audio is shorter).
         assert.ok(
-          result.audioData.length >= 240_000 && result.audioData.length <= 250_000,
+          result.audioData.length >= 60_000 && result.audioData.length <= 61_000,
           `unexpected sample count: ${result.audioData.length}`,
         );
       });
     }
+
+    it('preserves old 48 kHz encode lengths when configured', async () => {
+      runIsolatedNode(`
+        import { WSJTXLib, WSJTXMode } from './src/index.js';
+        const lib = new WSJTXLib({ encodeSampleRate: 48000 });
+        const ft8 = await lib.encode(WSJTXMode.FT8, 'CQ TEST K1ABC FN20', 1500);
+        if (ft8.sampleRate !== 48000 || ft8.audioData.length < 600000 || ft8.audioData.length > 620000) process.exit(1);
+        const ft4 = await lib.encode(WSJTXMode.FT4, 'CQ TEST K1ABC FN20', 1500);
+        if (ft4.sampleRate !== 48000 || ft4.audioData.length < 240000 || ft4.audioData.length > 250000) process.exit(1);
+      `);
+    });
 
     it('FT8 encodes 23-character structured nonstandard-call messages', async () => {
       const messages = [
@@ -239,6 +270,16 @@ describe('WSJTX library — regression', () => {
       assert.ok(Array.isArray(result.messages));
     });
 
+    it('48 kHz opt-in encoded audio still decodes structurally', async () => {
+      runIsolatedNode(`
+        import { WSJTXLib, WSJTXMode } from './src/index.js';
+        const lib = new WSJTXLib({ encodeSampleRate: 48000 });
+        const encoded = await lib.encode(WSJTXMode.FT8, 'CQ TEST K1ABC FN20', 1500);
+        const decoded = await lib.decode(WSJTXMode.FT8, encoded.audioData, { frequency: 1500, threads: 1 });
+        if (!decoded.success || !Array.isArray(decoded.messages)) process.exit(1);
+      `);
+    });
+
     it('decoded message text contains the encoded callsigns when SNR is sufficient', async () => {
       // Synthetic encoder output is essentially clean; decoding with a wide
       // search window should reliably recover the original message.
@@ -266,7 +307,7 @@ describe('WSJTX library — regression', () => {
     let silence: Float32Array;
 
     before(() => {
-      // 13 s of silence at 48 kHz — gives the decoder a full FT8 window.
+      // 13 s of silence at the default encode rate gives the decoder a full FT8 window.
       silence = new Float32Array(ENCODE_SAMPLE_RATE * 13);
     });
 
@@ -424,6 +465,13 @@ describe('WSJTX library — regression', () => {
 
     it('rejects encoding for decode-only mode (JT65)', async () => {
       await assert.rejects(() => lib.encode(WSJTXMode.JT65, 'CQ K1ABC FN20', 1500), WSJTXError);
+    });
+
+    it('rejects invalid encode sample rate', () => {
+      assert.throws(
+        () => new WSJTXLib({ encodeSampleRate: 44100 as 12000 }),
+        WSJTXError,
+      );
     });
 
     it('WSJTXError preserves message and code', () => {

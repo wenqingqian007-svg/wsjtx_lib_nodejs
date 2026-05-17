@@ -72,6 +72,7 @@ export interface DecodeResult {
 export interface EncodeResult {
   audioData: Float32Array;
   messageSent: string;
+  sampleRate: number;
 }
 
 export interface WSPRResult {
@@ -108,6 +109,8 @@ export class WSJTXError extends Error {
 export interface WSJTXConfig {
   /** Maximum threads used per decode call. Default 4. */
   maxThreads?: number;
+  /** Process-global FT8/FT4 encode output sample rate. Default 12000. */
+  encodeSampleRate?: 12000 | 48000;
   /** Reserved for future use; currently has no runtime effect. */
   debug?: boolean;
   /** Default lower scan limit in Hz, used when DecodeOptions.lowFreq is omitted. */

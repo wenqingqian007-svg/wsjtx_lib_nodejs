@@ -8,6 +8,9 @@
 
 namespace wsjtx_nodejs
 {
+    namespace {
+        int g_encodeSampleRate = 0;
+    }
 
     // ---- WSJTXLibWrapper ----
 
@@ -32,6 +35,26 @@ namespace wsjtx_nodejs
     WSJTXLibWrapper::WSJTXLibWrapper(const Napi::CallbackInfo &info)
         : Napi::ObjectWrap<WSJTXLibWrapper>(info)
     {
+        if (info.Length() > 0 && info[0].IsObject()) {
+            Napi::Object config = info[0].As<Napi::Object>();
+            if (config.Has("encodeSampleRate")) {
+                encodeSampleRate_ = config.Get("encodeSampleRate").As<Napi::Number>().Int32Value();
+            }
+        }
+        if (encodeSampleRate_ != 12000 && encodeSampleRate_ != 48000) {
+            Napi::Error::New(info.Env(), "encodeSampleRate must be 12000 or 48000")
+                .ThrowAsJavaScriptException();
+            return;
+        }
+        if (g_encodeSampleRate == 0) {
+            g_encodeSampleRate = encodeSampleRate_;
+        } else if (g_encodeSampleRate != encodeSampleRate_) {
+            Napi::Error::New(info.Env(), "encodeSampleRate is process-global and cannot be changed after the first WSJTXLib instance")
+                .ThrowAsJavaScriptException();
+            return;
+        }
+        encodeSampleRate_ = g_encodeSampleRate;
+
         handle_ = wsjtx_create();
         if (!handle_) {
             Napi::Error::New(info.Env(), "Failed to create wsjtx_lib instance")
@@ -132,7 +155,7 @@ namespace wsjtx_nodejs
             return env.Null();
         }
 
-        auto worker = new EncodeWorker(callback, handle_, mode, message, frequency, threads);
+        auto worker = new EncodeWorker(callback, handle_, mode, message, frequency, threads, encodeSampleRate_);
         worker->Queue();
 
         return env.Undefined();
@@ -259,6 +282,9 @@ namespace wsjtx_nodejs
             return env.Null();
         }
         int mode = info[0].As<Napi::Number>().Int32Value();
+        if (mode == 0 || mode == 1) {
+            return Napi::Number::New(env, encodeSampleRate_);
+        }
         return Napi::Number::New(env, wsjtx_get_sample_rate(mode));
     }
 
@@ -435,19 +461,20 @@ namespace wsjtx_nodejs
     // EncodeWorker
     EncodeWorker::EncodeWorker(Napi::Function &callback, wsjtx_handle_t handle,
                                int mode, const std::string &message,
-                               int frequency, int threads)
+                               int frequency, int threads, int sampleRate)
         : AsyncWorkerBase(callback, handle), mode_(mode), message_(message),
-          frequency_(frequency), threads_(threads) {}
+          frequency_(frequency), threads_(threads), sampleRate_(sampleRate) {}
 
     void EncodeWorker::Execute()
     {
-        // FT8 at 48kHz for 12.64s = ~607,000 samples; 1M buffer is plenty
+        // FT8 at 48kHz for 12.64s = ~607,000 samples; 1M buffer is plenty.
         static const int MAX_SAMPLES = 1024 * 1024;
         audioData_.resize(MAX_SAMPLES);
         int numSamples = 0;
         char msgSent[256] = {0};
 
         int rc = wsjtx_encode(handle_, mode_, frequency_,
+            sampleRate_,
             message_.c_str(),
             audioData_.data(), &numSamples, MAX_SAMPLES,
             msgSent, sizeof(msgSent));
@@ -471,6 +498,7 @@ namespace wsjtx_nodejs
         Napi::Object result = Napi::Object::New(env);
         result.Set("audioData", audioArray);
         result.Set("messageSent", Napi::String::New(env, messageSent_));
+        result.Set("sampleRate", Napi::Number::New(env, sampleRate_));
 
         Callback().Call({env.Null(), result});
     }

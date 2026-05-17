@@ -38,6 +38,7 @@ typedef void* wsjtx_handle_t;
 #define WSJTX_ERR_INVALID_MODE   -2
 #define WSJTX_ERR_ENCODE_FAILED  -3
 #define WSJTX_ERR_BUFFER_TOO_SMALL -4
+#define WSJTX_ERR_INVALID_SAMPLE_RATE -5
 #define WSJTX_ERR_EXCEPTION      -99
 
 /* Mode enumeration (must match wsjtxMode in wsjtx_lib.h) */
@@ -168,6 +169,7 @@ WSJTX_API int wsjtx_decode_int16_v2(wsjtx_handle_t handle, int mode,
 /**
  * Encode a message into audio samples.
  *
+ * @param sample_rate      Output sample rate for FT8/FT4 encode; must be 12000 or 48000
  * @param out_samples      Caller-allocated buffer for output audio samples
  * @param out_num_samples  On return, the number of samples written
  * @param out_buf_size     Size of out_samples buffer (in floats)
@@ -176,7 +178,7 @@ WSJTX_API int wsjtx_decode_int16_v2(wsjtx_handle_t handle, int mode,
  *
  * Returns WSJTX_OK on success, WSJTX_ERR_BUFFER_TOO_SMALL if buffer is insufficient.
  */
-WSJTX_API int wsjtx_encode(wsjtx_handle_t handle, int mode, int freq,
+WSJTX_API int wsjtx_encode(wsjtx_handle_t handle, int mode, int freq, int sample_rate,
     const char* message,
     float* out_samples, int* out_num_samples, int out_buf_size,
     char* out_message_sent, int out_msg_buf_size);

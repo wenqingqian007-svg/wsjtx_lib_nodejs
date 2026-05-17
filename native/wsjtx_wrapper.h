@@ -38,7 +38,8 @@ private:
     std::vector<float> ConvertToFloatArray(Napi::Env env, const Napi::Value& audioData);
     std::vector<short int> ConvertToIntArray(Napi::Env env, const Napi::Value& audioData);
 
-    wsjtx_handle_t handle_;
+    wsjtx_handle_t handle_ = nullptr;
+    int encodeSampleRate_ = 12000;
 };
 
 /**
@@ -75,7 +76,7 @@ class EncodeWorker : public AsyncWorkerBase {
 public:
     EncodeWorker(Napi::Function& callback, wsjtx_handle_t handle,
                  int mode, const std::string& message,
-                 int frequency, int threads);
+                 int frequency, int threads, int sampleRate);
 
 protected:
     void Execute() override;
@@ -86,6 +87,7 @@ private:
     std::string message_;
     int frequency_;
     int threads_;
+    int sampleRate_;
     std::vector<float> audioData_;
     std::string messageSent_;
 };

@@ -22,8 +22,8 @@ struct ModeMetadata {
 };
 
 static const ModeMetadata MODE_TABLE[] = {
-    /* FT8     */ { 48000, 12.64, 1, 1 },
-    /* FT4     */ { 48000,  6.0,  1, 1 },
+    /* FT8     */ { 12000, 12.64, 1, 1 },
+    /* FT4     */ { 12000,  6.0,  1, 1 },
     /* JT4     */ { 11025, 47.1,  0, 1 },
     /* JT65    */ { 11025, 46.8,  0, 1 },
     /* JT9     */ { 12000, 49.0,  0, 1 },
@@ -147,18 +147,19 @@ WSJTX_API int wsjtx_decode_int16_v2(wsjtx_handle_t handle, int mode,
 
 /* ---- Encode ---- */
 
-WSJTX_API int wsjtx_encode(wsjtx_handle_t handle, int mode, int freq,
+WSJTX_API int wsjtx_encode(wsjtx_handle_t handle, int mode, int freq, int sample_rate,
     const char* message,
     float* out_samples, int* out_num_samples, int out_buf_size,
     char* out_message_sent, int out_msg_buf_size)
 {
     if (!handle) return WSJTX_ERR_INVALID_HANDLE;
     if (!valid_mode(mode)) return WSJTX_ERR_INVALID_MODE;
+    if (sample_rate != 12000 && sample_rate != 48000) return WSJTX_ERR_INVALID_SAMPLE_RATE;
 
     try {
         std::string messageSent;
         std::vector<float> audio = to_lib(handle)->encode(
-            static_cast<wsjtxMode>(mode), freq, std::string(message), messageSent);
+            static_cast<wsjtxMode>(mode), freq, std::string(message), messageSent, sample_rate);
 
         if (audio.empty()) return WSJTX_ERR_ENCODE_FAILED;
 

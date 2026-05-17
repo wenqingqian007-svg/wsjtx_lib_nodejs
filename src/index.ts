@@ -6,7 +6,7 @@
  *   - WSJTXLib.decode(mode, audio, options)
  *   - WSJTXLib.decodeWSPR(audio, options)
  *   - WSJTXLib.convertAudioFormat(audio, target)
- *   - capability/sample-rate query helpers
+ *   - capability/sample-rate query helpers (FT8/FT4 default encode rate: 12 kHz)
  */
 
 import {
@@ -30,7 +30,7 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface NativeBinding {
-  WSJTXLib: new () => NativeWSJTXLib;
+  WSJTXLib: new (config?: { encodeSampleRate?: number }) => NativeWSJTXLib;
 }
 
 interface NativeDecodeOptions {
@@ -70,6 +70,7 @@ const NativeWSJTXLib = loadNativeBinding();
 
 const DEFAULT_CONFIG: Required<WSJTXConfig> = {
   maxThreads: 4,
+  encodeSampleRate: 12000,
   debug: false,
   defaultLowFreq: 200,
   defaultHighFreq: 4000,
@@ -88,7 +89,8 @@ export class WSJTXLib {
 
   constructor(config: WSJTXConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.native = new NativeWSJTXLib();
+    this.validateEncodeSampleRate(this.config.encodeSampleRate);
+    this.native = new NativeWSJTXLib({ encodeSampleRate: this.config.encodeSampleRate });
   }
 
   async decode(mode: WSJTXMode, audioData: AudioData, options: DecodeOptions): Promise<DecodeResult> {
@@ -218,6 +220,12 @@ export class WSJTXLib {
   private validateFrequency(freq: number): void {
     if (!Number.isInteger(freq) || freq < FREQ_MIN || freq > FREQ_MAX) {
       throw new WSJTXError('Invalid frequency', 'INVALID');
+    }
+  }
+
+  private validateEncodeSampleRate(sampleRate: number): void {
+    if (sampleRate !== 12000 && sampleRate !== 48000) {
+      throw new WSJTXError('encodeSampleRate must be 12000 or 48000', 'INVALID');
     }
   }
 

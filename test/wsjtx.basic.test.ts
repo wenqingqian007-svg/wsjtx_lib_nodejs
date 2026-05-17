@@ -7,6 +7,7 @@
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import { spawnSync } from 'node:child_process';
 import { WSJTXLib, WSJTXMode, WSJTXError } from '../src/index.js';
 
 describe('WSJTX library — smoke', () => {
@@ -20,8 +21,20 @@ describe('WSJTX library — smoke', () => {
     assert.ok(lib instanceof WSJTXLib);
   });
 
-  it('reports FT8 sample rate of 48 kHz', () => {
-    assert.strictEqual(lib.getSampleRate(WSJTXMode.FT8), 48000);
+  it('reports FT8 default encode sample rate of 12 kHz', () => {
+    assert.strictEqual(lib.getSampleRate(WSJTXMode.FT8), 12000);
+  });
+
+  it('supports 48 kHz encode sample rate opt-in', () => {
+    const result = spawnSync(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      "import { WSJTXLib, WSJTXMode } from './dist/src/index.js'; const lib = new WSJTXLib({ encodeSampleRate: 48000 }); if (lib.getSampleRate(WSJTXMode.FT8) !== 48000) process.exit(1);",
+    ], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, result.stderr || result.stdout);
   });
 
   it('reports FT8 supports both encode and decode', () => {
@@ -60,6 +73,13 @@ describe('WSJTX library — smoke', () => {
     );
   });
 
+  it('rejects invalid encode sample rate', () => {
+    assert.throws(
+      () => new WSJTXLib({ encodeSampleRate: 44100 as 12000 }),
+      WSJTXError,
+    );
+  });
+
   it('rejects empty audio in decode', async () => {
     await assert.rejects(
       () => lib.decode(WSJTXMode.FT8, new Float32Array(0), { frequency: 1500 }),
@@ -83,7 +103,7 @@ describe('WSJTX library — smoke', () => {
   });
 
   it('decode of silence completes successfully with empty messages', async () => {
-    const r = await lib.decode(WSJTXMode.FT8, new Float32Array(48000 * 13), {
+    const r = await lib.decode(WSJTXMode.FT8, new Float32Array(12000 * 13), {
       frequency: 1500,
       threads: 1,
     });
@@ -92,7 +112,7 @@ describe('WSJTX library — smoke', () => {
   });
 
   it('decode accepts dxCall, dxGrid, and freq range options without crashing', async () => {
-    const r = await lib.decode(WSJTXMode.FT8, new Float32Array(48000 * 13), {
+    const r = await lib.decode(WSJTXMode.FT8, new Float32Array(12000 * 13), {
       frequency: 1500,
       threads: 1,
       dxCall: 'K1ABC',
