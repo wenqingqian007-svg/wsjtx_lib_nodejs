@@ -186,6 +186,13 @@ pkg_check_modules(FFTW3F REQUIRED fftw3f)
 
 # FFTW3 threads support
 if(UNIX AND NOT APPLE)
+    # Detect musl (Alpine/HarmonyOS) - use Alpine package paths
+    execute_process(COMMAND sh -c "ldd --version 2>&1 || true"
+        OUTPUT_VARIABLE LDD_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(LDD_VERSION MATCHES "musl|Alpine")
+        set(IS_MUSL TRUE)
+        message(STATUS "musl libc detected, using Alpine-style paths")
+    endif()
     find_library(FFTW3F_THREADS_LIB NAMES fftw3f_threads
         PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu)
 elseif(APPLE)
@@ -286,8 +293,14 @@ if(APPLE)
         target_link_libraries(wsjtx_core PRIVATE fftw3f_threads)
     endif()
 elseif(UNIX)
-    target_link_libraries(wsjtx_core PRIVATE
-        ${FFTW3F_LIBRARIES} gfortran gcc_s pthread)
+    if(IS_MUSL)
+        # musl: static link Fortran/gcc libs, no libgcc_s (use libgcc_eh)
+        target_link_libraries(wsjtx_core PRIVATE
+            ${FFTW3F_LIBRARIES} -static-libgfortran -static-libgcc gfortran gcc_s pthread)
+    else()
+        target_link_libraries(wsjtx_core PRIVATE
+            ${FFTW3F_LIBRARIES} gfortran gcc_s pthread)
+    endif()
     if(FFTW_HAS_THREADS)
         target_link_libraries(wsjtx_core PRIVATE fftw3f_threads)
     endif()
@@ -317,10 +330,18 @@ set_target_properties(wsjtx_core PROPERTIES
 
 # Linux RPATH
 if(UNIX AND NOT APPLE)
-    set_target_properties(wsjtx_core PROPERTIES
-        BUILD_RPATH "\$ORIGIN"
-        INSTALL_RPATH "\$ORIGIN"
-    )
+    if(IS_MUSL)
+        set_target_properties(wsjtx_core PROPERTIES
+            BUILD_RPATH "\$ORIGIN"
+            INSTALL_RPATH "\$ORIGIN"
+            LINK_FLAGS "-Wl,--gc-sections"
+        )
+    else()
+        set_target_properties(wsjtx_core PROPERTIES
+            BUILD_RPATH "\$ORIGIN"
+            INSTALL_RPATH "\$ORIGIN"
+        )
+    endif()
 endif()
 
 # If core-only build, stop here
